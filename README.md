@@ -36,6 +36,8 @@ Built by **Egalistel** — [egamaker.be](https://egamaker.be)
 
 ## 🔌 Wiring
 
+![Wiring Diagram](wiring.svg)
+
 ```
 PIR Sensor       NodeMCU
   VCC       →    3.3V
@@ -149,3 +151,8 @@ MIT License — see [LICENSE](LICENSE) for details.
 ## 🙏 Credits
 
 Made with ❤️ by **Egalistel** — [egamaker.be](https://egamaker.be)
+
+If this project helped you, consider buying me a coffee ☕
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support%20this%20project-f5a623?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white)](https://buymeacoffee.com/egalistelw)
+tps://egamaker.be)
