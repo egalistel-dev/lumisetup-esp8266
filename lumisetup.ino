@@ -75,6 +75,7 @@ struct Config {
   bool     systemActive = true;
   bool     modeOn       = false;
   uint8_t  pirDebounce  = 3;
+  bool     langFR       = true;   // true = Français, false = English
 };
 
 // ─────────────────────────────────────────────
@@ -95,7 +96,7 @@ unsigned long lightOffTime = 0;
 unsigned long lastPirTime  = 0;
 
 // ─────────────────────────────────────────────
-//  PAGE PORTAIL WIFI (HTML minimal)
+//  PAGE PORTAIL WIFI (HTML minimal bilingue)
 // ─────────────────────────────────────────────
 const char PORTAL_HTML[] PROGMEM = R"rawhtml(
 <!DOCTYPE html><html lang="fr">
@@ -122,47 +123,93 @@ button:disabled{opacity:.5;cursor:not-allowed;}
 .msg span{display:block;font-size:.78rem;color:#7a7a9a;margin-top:4px;}
 footer{margin-top:28px;font-size:.75rem;color:#4a4a6a;}
 footer a{color:#f5a623;text-decoration:none;}
+.lang-bar{display:flex;justify-content:flex-end;margin-bottom:16px;gap:6px;}
+.lang-btn{padding:4px 12px;border-radius:20px;border:1px solid #2a2a3a;
+          background:transparent;color:#7a7a9a;font-size:.8rem;cursor:pointer;transition:all .2s;}
+.lang-btn.active{background:#f5a623;color:#111;border-color:#f5a623;font-weight:700;}
 </style>
 </head>
 <body>
 <div class="card">
+  <div class="lang-bar">
+    <button class="lang-btn" id="btnFR" onclick="setLang(true)">FR</button>
+    <button class="lang-btn" id="btnEN" onclick="setLang(false)">EN</button>
+  </div>
   <h1>💡 LumiSetup</h1>
-  <p>Configurez la connexion WiFi<br>pour votre lampe connectée.</p>
-  <label>Nom du réseau WiFi (SSID)</label>
-  <input type="text" id="ssid" placeholder="Mon réseau WiFi">
-  <label>Mot de passe</label>
-  <input type="password" id="pass" placeholder="Mot de passe">
-  <button id="submitBtn" onclick="save()">Se connecter</button>
+  <p id="pDesc"></p>
+  <label id="lblSsid"></label>
+  <input type="text" id="ssid" placeholder="">
+  <label id="lblPass"></label>
+  <input type="password" id="pass" placeholder="">
+  <button id="submitBtn" onclick="save()"></button>
   <div class="msg" id="msg">
-    ✓ Identifiants enregistrés !
-    <span>L'appareil redémarre et tente de rejoindre votre réseau.<br>
-    Reconnectez-vous à votre WiFi habituel puis ouvrez<br>
-    <strong>http://lumisetup.local</strong></span>
+    <span id="msgTitle"></span>
+    <span id="msgBody"></span>
   </div>
   <footer>Egalistel &nbsp;·&nbsp; <a href="https://egamaker.be" target="_blank">egamaker.be</a></footer>
 </div>
 <script>
+const T={
+  fr:{desc:'Configurez la connexion WiFi<br>pour votre lampe connectée.',
+      ssid:'Nom du réseau WiFi (SSID)',ssidPh:'Mon réseau WiFi',
+      pass:'Mot de passe',passPh:'Mot de passe',btn:'Se connecter',
+      saving:'Enregistrement...',noSsid:'Entrez un nom de réseau.',
+      msgTitle:'✓ Identifiants enregistrés !',
+      msgBody:"L'appareil redémarre et tente de rejoindre votre réseau.<br>Reconnectez-vous à votre WiFi habituel puis ouvrez<br><strong>http://lumisetup.local</strong>"},
+  en:{desc:'Configure the WiFi connection<br>for your smart lamp.',
+      ssid:'WiFi Network Name (SSID)',ssidPh:'My WiFi Network',
+      pass:'Password',passPh:'Password',btn:'Connect',
+      saving:'Saving...',noSsid:'Please enter a network name.',
+      msgTitle:'✓ Credentials saved!',
+      msgBody:'The device is restarting and joining your network.<br>Reconnect to your home WiFi then open<br><strong>http://lumisetup.local</strong>'}
+};
+
+let isFR = true;
+
+function applyLang(){
+  const l=isFR?T.fr:T.en;
+  document.getElementById('pDesc').innerHTML=l.desc;
+  document.getElementById('lblSsid').textContent=l.ssid;
+  document.getElementById('ssid').placeholder=l.ssidPh;
+  document.getElementById('lblPass').textContent=l.pass;
+  document.getElementById('pass').placeholder=l.passPh;
+  const btn=document.getElementById('submitBtn');
+  if(!btn.disabled) btn.textContent=l.btn;
+  document.getElementById('btnFR').classList.toggle('active',isFR);
+  document.getElementById('btnEN').classList.toggle('active',!isFR);
+}
+
+async function setLang(fr){
+  isFR=fr;
+  applyLang();
+  try{ await fetch('/toggle/lang',{method:'POST'}); }catch(e){}
+}
+
 async function save(){
   const ssid=document.getElementById('ssid').value.trim();
   const pass=document.getElementById('pass').value;
-  if(!ssid){alert('Entrez un nom de réseau.');return;}
-  // Afficher le message ET désactiver le bouton immédiatement
+  const l=isFR?T.fr:T.en;
+  if(!ssid){alert(l.noSsid);return;}
   const btn=document.getElementById('submitBtn');
   btn.disabled=true;
-  btn.textContent='Enregistrement...';
+  btn.textContent=l.saving;
+  document.getElementById('msgTitle').textContent=l.msgTitle;
+  document.getElementById('msgBody').innerHTML=l.msgBody;
   document.getElementById('msg').style.display='block';
-  // Envoyer en arrière-plan (l'ESP peut redémarrer avant la réponse, c'est normal)
   try{
     const b=new URLSearchParams({ssid,pass});
     await fetch('/wifi/save',{method:'POST',body:b});
-  }catch(e){/* redémarrage ESP normal */}
+  }catch(e){}
 }
+
+// Init
+applyLang();
 </script>
 </body></html>
 )rawhtml";
 
 // ─────────────────────────────────────────────
-//  PAGE PRINCIPALE (HTML embarqué)
+//  PAGE PRINCIPALE (HTML embarqué bilingue)
 // ─────────────────────────────────────────────
 const char INDEX_HTML[] PROGMEM = R"rawhtml(
 <!DOCTYPE html>
@@ -194,6 +241,10 @@ body{
 header{text-align:center;padding:20px 0 8px;}
 header h1{font-size:1.6rem;color:var(--accent);letter-spacing:.06em;}
 header p{color:var(--muted);font-size:.85rem;margin-top:4px;}
+.lang-bar{display:flex;justify-content:center;gap:8px;margin-top:10px;}
+.lang-btn{padding:4px 16px;border-radius:20px;border:1px solid var(--border);
+          background:transparent;color:var(--muted);font-size:.82rem;cursor:pointer;transition:all .2s;}
+.lang-btn.active{background:var(--accent);color:#111;border-color:var(--accent);font-weight:700;}
 .card{
   background:var(--card);border:1px solid var(--border);
   border-radius:var(--radius);padding:20px;
@@ -304,24 +355,28 @@ footer a:hover{text-decoration:underline;}
 <header class="full-width">
   <h1>💡 LumiSetup</h1>
   <p id="clockDisplay">--:--</p>
+  <div class="lang-bar">
+    <button class="lang-btn" id="btnFR" onclick="setLang(true)">FR</button>
+    <button class="lang-btn" id="btnEN" onclick="setLang(false)">EN</button>
+  </div>
 </header>
 
 <div class="page-grid">
 
   <div class="card">
-    <div class="card-title">État du système</div>
-    <div class="status-row"><div class="dot" id="dotLeds"></div><span id="statusLeds">LEDs éteintes</span></div>
-    <div class="status-row"><div class="dot" id="dotPir"></div><span id="statusPir">Aucun mouvement</span></div>
-    <div class="status-row"><div class="dot" id="dotRange"></div><span id="statusRange">Hors plage horaire</span></div>
-    <div class="status-row"><div class="dot" id="dotOverride"></div><span id="statusOverride">Override inactif</span></div>
+    <div class="card-title" id="tStatus"></div>
+    <div class="status-row"><div class="dot" id="dotLeds"></div><span id="statusLeds"></span></div>
+    <div class="status-row"><div class="dot" id="dotPir"></div><span id="statusPir"></span></div>
+    <div class="status-row"><div class="dot" id="dotRange"></div><span id="statusRange"></span></div>
+    <div class="status-row"><div class="dot" id="dotOverride"></div><span id="statusOverride"></span></div>
   </div>
 
   <div class="card">
-    <div class="card-title">Contrôles</div>
+    <div class="card-title" id="tControls"></div>
     <div class="toggle-row">
       <div>
-        <div class="toggle-label">Système actif</div>
-        <div class="toggle-sub">Désactiver éteint tout</div>
+        <div class="toggle-label" id="tSysLabel"></div>
+        <div class="toggle-sub" id="tSysSub"></div>
       </div>
       <label class="switch">
         <input type="checkbox" id="toggleSystem" onchange="postToggle('/toggle/system')">
@@ -329,38 +384,36 @@ footer a:hover{text-decoration:underline;}
       </label>
     </div>
     <hr>
-    <div class="card-title" style="margin-top:4px">Mode</div>
+    <div class="card-title" id="tMode" style="margin-top:4px"></div>
     <div class="mode-row">
       <button class="mode-btn" id="btnAuto" onclick="setMode(false)">AUTO</button>
       <button class="mode-btn" id="btnOn"   onclick="setMode(true)">ON</button>
     </div>
-    <p class="hint">AUTO : PIR actif dans la plage horaire &nbsp;|&nbsp; ON : toujours allumé</p>
+    <p class="hint" id="tModeHint"></p>
     <hr>
-    <div class="card-title" style="margin-top:4px">Override</div>
-    <button class="override-btn" id="btnOverride" onclick="postToggle('/toggle/override')">
-      🔆 Maintenir allumé
-    </button>
-    <p class="hint">Force l'allumage hors plage ou hors durée. Appuyez à nouveau pour revenir au comportement normal.</p>
+    <div class="card-title" id="tOverrideTitle" style="margin-top:4px"></div>
+    <button class="override-btn" id="btnOverride" onclick="postToggle('/toggle/override')"></button>
+    <p class="hint" id="tOverrideHint"></p>
   </div>
 
   <div class="card">
-    <div class="card-title">LEDs</div>
+    <div class="card-title" id="tLeds"></div>
     <div class="color-row">
-      <span class="form-label">Couleur</span>
+      <span class="form-label" id="tColor"></span>
       <input type="color" id="colorPicker" value="#ffc864">
     </div>
     <div class="form-row">
-      <span class="form-label">Intensité<small id="lblBrightness">80%</small></span>
+      <span class="form-label" id="tBrightness"></span>
       <input type="range" id="brightness" min="0" max="100" value="80"
              oninput="document.getElementById('lblBrightness').textContent=this.value+'%'">
     </div>
     <div class="form-row">
-      <span class="form-label">Nombre de LEDs</span>
+      <span class="form-label" id="tNumLeds"></span>
       <input type="number" id="numLeds" min="1" max="300" value="30">
     </div>
     <div class="toggle-row">
       <div>
-        <div class="toggle-label">Effet fondu</div>
+        <div class="toggle-label" id="tFadeLabel"></div>
         <div class="toggle-sub">Fade-in / fade-out</div>
       </div>
       <label class="switch">
@@ -371,26 +424,26 @@ footer a:hover{text-decoration:underline;}
   </div>
 
   <div class="card">
-    <div class="card-title">Détection & Plage horaire</div>
+    <div class="card-title" id="tDetect"></div>
     <div class="form-row">
-      <span class="form-label">Durée allumage<small>secondes après détection</small></span>
+      <span class="form-label" id="tDuration"></span>
       <input type="number" id="duration" min="5" max="3600" value="120">
     </div>
     <div class="form-row">
-      <span class="form-label">Anti-rebond PIR<small>délai min entre détections (s)</small></span>
+      <span class="form-label" id="tDebounce"></span>
       <input type="number" id="pirDebounce" min="1" max="60" value="3">
     </div>
     <hr>
     <div class="form-row">
-      <span class="form-label">Début plage horaire</span>
+      <span class="form-label" id="tStart"></span>
       <input type="time" id="startTime" value="18:00">
     </div>
     <div class="form-row">
-      <span class="form-label">Fin plage horaire</span>
+      <span class="form-label" id="tEnd"></span>
       <input type="time" id="endTime" value="23:00">
     </div>
     <div class="form-row">
-      <span class="form-label">Fuseau horaire</span>
+      <span class="form-label" id="tTz"></span>
       <select id="tzOffset">
         <option value="-12">UTC-12</option><option value="-11">UTC-11</option>
         <option value="-10">UTC-10</option><option value="-9">UTC-9</option>
@@ -411,12 +464,12 @@ footer a:hover{text-decoration:underline;}
   </div>
 
   <div class="card full-width">
-    <button class="save-btn" onclick="saveConfig()">💾 Enregistrer la configuration</button>
-    <button class="danger-btn" onclick="openWifiModal()">📶 Réinitialiser la connexion WiFi</button>
+    <button class="save-btn" id="tSaveBtn" onclick="saveConfig()"></button>
+    <button class="danger-btn" id="tWifiBtn" onclick="openWifiModal()"></button>
   </div>
 
   <footer class="full-width">
-    Conçu par <strong>Egalistel</strong> &nbsp;·&nbsp;
+    <span id="tFooter"></span> &nbsp;·&nbsp;
     <a href="https://egamaker.be" target="_blank">egamaker.be</a>
   </footer>
 
@@ -424,13 +477,11 @@ footer a:hover{text-decoration:underline;}
 
 <div class="modal-bg" id="wifiModal">
   <div class="modal">
-    <h2>Réinitialiser le WiFi ?</h2>
-    <p>Les identifiants WiFi seront effacés.<br>
-       L'ESP redémarrera et ouvrira le point d'accès <strong>LumiSetup</strong>.<br>
-       Connectez-vous dessus pour reconfigurer.</p>
+    <h2 id="tModalTitle"></h2>
+    <p id="tModalBody"></p>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeWifiModal()">Annuler</button>
-      <button class="btn-confirm" onclick="confirmWifiReset()">Confirmer</button>
+      <button class="btn-cancel" id="tModalCancel" onclick="closeWifiModal()"></button>
+      <button class="btn-confirm" id="tModalConfirm" onclick="confirmWifiReset()"></button>
     </div>
   </div>
 </div>
@@ -438,9 +489,116 @@ footer a:hover{text-decoration:underline;}
 <div class="toast" id="toast"></div>
 
 <script>
+// ── Traductions ──────────────────────────────
+const T={
+  fr:{
+    status:'État du système',controls:'Contrôles',
+    sysLabel:'Système actif',sysSub:'Désactiver éteint tout',
+    mode:'Mode',modeHint:'AUTO : PIR actif dans la plage horaire | ON : toujours allumé',
+    overrideTitle:'Override',
+    overrideBtn:'🔆 Maintenir allumé',overrideBtnActive:'🔆 Override actif — appuyer pour désactiver',
+    overrideHint:"Force l'allumage hors plage ou hors durée. Appuyez à nouveau pour revenir au comportement normal.",
+    leds:'LEDs',color:'Couleur',
+    brightness:'Intensité',numLeds:'Nombre de LEDs',fadeLabel:'Effet fondu',
+    detect:'Détection & Plage horaire',
+    duration:'Durée allumage',durationSub:'secondes après détection',
+    debounce:'Anti-rebond PIR',debounceSub:'délai min entre détections (s)',
+    start:'Début plage horaire',end:'Fin plage horaire',tz:'Fuseau horaire',
+    saveBtn:'💾 Enregistrer la configuration',wifiBtn:'📶 Réinitialiser la connexion WiFi',
+    footer:'Conçu par Egalistel',
+    modalTitle:'Réinitialiser le WiFi ?',
+    modalBody:'Les identifiants WiFi seront effacés.<br>L\'ESP redémarrera et ouvrira le point d\'accès <strong>LumiSetup</strong>.<br>Connectez-vous dessus pour reconfigurer.',
+    cancel:'Annuler',confirm:'Confirmer',
+    ledsOn:'LEDs allumées',ledsOff:'LEDs éteintes',
+    pirOn:'Mouvement détecté !',pirOff:'Aucun mouvement',
+    rangeOn:'Dans la plage horaire',rangeOff:'Hors plage horaire',
+    ovOn:'Override actif',ovOff:'Override inactif',
+    toastSaved:'✓ Configuration enregistrée',toastReset:'📶 Redémarrage...',
+  },
+  en:{
+    status:'System Status',controls:'Controls',
+    sysLabel:'System active',sysSub:'Disabling turns everything off',
+    mode:'Mode',modeHint:'AUTO: PIR active within time range | ON: always on',
+    overrideTitle:'Override',
+    overrideBtn:'🔆 Force light on',overrideBtnActive:'🔆 Override active — press to disable',
+    overrideHint:'Forces the light on regardless of schedule. Press again to return to normal behavior.',
+    leds:'LEDs',color:'Color',
+    brightness:'Brightness',numLeds:'Number of LEDs',fadeLabel:'Fade effect',
+    detect:'Detection & Time Range',
+    duration:'On duration',durationSub:'seconds after detection',
+    debounce:'PIR debounce',debounceSub:'min delay between triggers (s)',
+    start:'Time range start',end:'Time range end',tz:'Timezone',
+    saveBtn:'💾 Save configuration',wifiBtn:'📶 Reset WiFi connection',
+    footer:'Made by Egalistel',
+    modalTitle:'Reset WiFi?',
+    modalBody:'WiFi credentials will be erased.<br>The ESP will restart and open the <strong>LumiSetup</strong> access point.<br>Connect to it to reconfigure.',
+    cancel:'Cancel',confirm:'Confirm',
+    ledsOn:'LEDs on',ledsOff:'LEDs off',
+    pirOn:'Motion detected!',pirOff:'No motion',
+    rangeOn:'Within time range',rangeOff:'Outside time range',
+    ovOn:'Override active',ovOff:'Override inactive',
+    toastSaved:'✓ Configuration saved',toastReset:'📶 Restarting...',
+  }
+};
+
+let isFR=true;
+let lastStatus={};
+
+function applyLang(){
+  const l=isFR?T.fr:T.en;
+  document.getElementById('btnFR').classList.toggle('active',isFR);
+  document.getElementById('btnEN').classList.toggle('active',!isFR);
+  setText('tStatus',l.status);setText('tControls',l.controls);
+  setText('tSysLabel',l.sysLabel);setText('tSysSub',l.sysSub);
+  setText('tMode',l.mode);setText('tModeHint',l.modeHint);
+  setText('tOverrideTitle',l.overrideTitle);setText('tOverrideHint',l.overrideHint);
+  setText('tLeds',l.leds);setText('tColor',l.color);
+  setHTML('tBrightness',l.brightness+'<small id="lblBrightness">'+document.getElementById('brightness').value+'%</small>');
+  setText('tNumLeds',l.numLeds);setText('tFadeLabel',l.fadeLabel);
+  setText('tDetect',l.detect);
+  setHTML('tDuration',l.duration+'<small>'+l.durationSub+'</small>');
+  setHTML('tDebounce',l.debounce+'<small>'+l.debounceSub+'</small>');
+  setText('tStart',l.start);setText('tEnd',l.end);setText('tTz',l.tz);
+  setText('tSaveBtn',l.saveBtn);setText('tWifiBtn',l.wifiBtn);
+  setText('tFooter',l.footer);
+  setText('tModalTitle',l.modalTitle);setHTML('tModalBody',l.modalBody);
+  setText('tModalCancel',l.cancel);setText('tModalConfirm',l.confirm);
+  // refresh dynamic status texts
+  if(lastStatus.ledsOn!==undefined) applyStatus(lastStatus);
+  // override button
+  const ov=document.getElementById('btnOverride');
+  if(ov) ov.textContent=lastStatus.overrideOn?l.overrideBtnActive:l.overrideBtn;
+}
+
+function setText(id,t){const e=document.getElementById(id);if(e)e.textContent=t;}
+function setHTML(id,h){const e=document.getElementById(id);if(e)e.innerHTML=h;}
+
+async function setLang(fr){
+  isFR=fr;
+  applyLang();
+  try{await fetch('/toggle/lang',{method:'POST'});}catch(e){}
+}
+
+// ── Helpers ──────────────────────────────────
 function hexToRgb(h){return{r:parseInt(h.slice(1,3),16),g:parseInt(h.slice(3,5),16),b:parseInt(h.slice(5,7),16)};}
 function rgbToHex(r,g,b){return'#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+function sd(id,cls){document.getElementById(id).className='dot '+cls;}
+
+// ── Status ───────────────────────────────────
+function applyStatus(d){
+  const l=isFR?T.fr:T.en;
+  document.getElementById('toggleSystem').checked=d.systemActive;
+  document.getElementById('btnAuto').classList.toggle('active',!d.modeOn);
+  document.getElementById('btnOn').classList.toggle('active',d.modeOn);
+  const ov=document.getElementById('btnOverride');
+  ov.classList.toggle('active',d.overrideOn);
+  ov.textContent=d.overrideOn?l.overrideBtnActive:l.overrideBtn;
+  sd('dotLeds',    d.ledsOn?'on':'off');    setText('statusLeds',    d.ledsOn?l.ledsOn:l.ledsOff);
+  sd('dotPir',     d.pirState?'warn':'off');setText('statusPir',     d.pirState?l.pirOn:l.pirOff);
+  sd('dotRange',   d.inRange?'on':'off');   setText('statusRange',   d.inRange?l.rangeOn:l.rangeOff);
+  sd('dotOverride',d.overrideOn?'warn':'off');setText('statusOverride',d.overrideOn?l.ovOn:l.ovOff);
+}
 
 async function postToggle(url){
   try{await fetch(url,{method:'POST'});await refreshStatus();}
@@ -457,20 +615,17 @@ async function refreshStatus(){
   try{
     const d=await(await fetch('/status')).json();
     document.getElementById('clockDisplay').textContent=d.time||'--:--';
-    document.getElementById('toggleSystem').checked=d.systemActive;
-    document.getElementById('btnAuto').classList.toggle('active',!d.modeOn);
-    document.getElementById('btnOn').classList.toggle('active',d.modeOn);
-    const ov=document.getElementById('btnOverride');
-    ov.classList.toggle('active',d.overrideOn);
-    ov.textContent=d.overrideOn?'🔆 Override actif — appuyer pour désactiver':'🔆 Maintenir allumé';
-    sd('dotLeds',   d.ledsOn?'on':'off');   document.getElementById('statusLeds').textContent   =d.ledsOn?'LEDs allumées':'LEDs éteintes';
-    sd('dotPir',    d.pirState?'warn':'off');document.getElementById('statusPir').textContent    =d.pirState?'Mouvement détecté !':'Aucun mouvement';
-    sd('dotRange',  d.inRange?'on':'off');  document.getElementById('statusRange').textContent  =d.inRange?'Dans la plage horaire':'Hors plage horaire';
-    sd('dotOverride',d.overrideOn?'warn':'off');document.getElementById('statusOverride').textContent=d.overrideOn?'Override actif':'Override inactif';
+    // Sync language from config if first load
+    if(d.langFR!==undefined && isFR!==d.langFR){
+      isFR=d.langFR;
+      applyLang();
+    }
+    lastStatus=d;
+    applyStatus(d);
   }catch(e){console.error(e);}
 }
-function sd(id,cls){document.getElementById(id).className='dot '+cls;}
 
+// ── Config ───────────────────────────────────
 async function loadConfig(){
   try{
     const d=await(await fetch('/config')).json();
@@ -486,10 +641,12 @@ async function loadConfig(){
     document.getElementById('startTime').value=sh+':'+sm;
     document.getElementById('endTime').value  =eh+':'+em;
     document.getElementById('tzOffset').value =d.tzOffset??1;
+    if(d.langFR!==undefined){isFR=d.langFR;applyLang();}
   }catch(e){console.error(e);}
 }
 
 async function saveConfig(){
+  const l=isFR?T.fr:T.en;
   const rgb=hexToRgb(document.getElementById('colorPicker').value);
   const [sh,sm]=document.getElementById('startTime').value.split(':').map(Number);
   const [eh,em]=document.getElementById('endTime').value.split(':').map(Number);
@@ -503,18 +660,21 @@ async function saveConfig(){
     startHour:sh,startMin:sm,endHour:eh,endMin:em,
     tzOffset:document.getElementById('tzOffset').value,
   });
-  try{await fetch('/config',{method:'POST',body});showToast('✓ Configuration enregistrée');}
-  catch(e){alert('Erreur sauvegarde');}
+  try{await fetch('/config',{method:'POST',body});showToast(l.toastSaved);}
+  catch(e){alert('Error');}
 }
 
 function openWifiModal(){document.getElementById('wifiModal').classList.add('open');}
 function closeWifiModal(){document.getElementById('wifiModal').classList.remove('open');}
 async function confirmWifiReset(){
+  const l=isFR?T.fr:T.en;
   closeWifiModal();
-  try{await fetch('/wifi/reset',{method:'POST'});showToast('📶 Redémarrage...');}
+  try{await fetch('/wifi/reset',{method:'POST'});showToast(l.toastReset);}
   catch(e){}
 }
 
+// ── Init ─────────────────────────────────────
+applyLang();
 loadConfig();
 refreshStatus();
 setInterval(refreshStatus,3000);
@@ -741,7 +901,7 @@ void loadConfig() {
   if (!LittleFS.exists(CONFIG_FILE)) { saveConfig(); return; }
   File f = LittleFS.open(CONFIG_FILE, "r");
   if (!f) return;
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<600> doc;
   if (deserializeJson(doc, f) == DeserializationError::Ok) {
     cfg.numLeds      = doc["numLeds"]      | cfg.numLeds;
     cfg.red          = doc["red"]          | cfg.red;
@@ -758,6 +918,7 @@ void loadConfig() {
     cfg.systemActive = doc["systemActive"] | cfg.systemActive;
     cfg.modeOn       = doc["modeOn"]       | cfg.modeOn;
     cfg.pirDebounce  = doc["pirDebounce"]  | cfg.pirDebounce;
+    cfg.langFR       = doc["langFR"]       | cfg.langFR;
   }
   f.close();
   Serial.println("[Config] Chargée");
@@ -766,7 +927,7 @@ void loadConfig() {
 void saveConfig() {
   File f = LittleFS.open(CONFIG_FILE, "w");
   if (!f) return;
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<600> doc;
   doc["numLeds"]      = cfg.numLeds;
   doc["red"]          = cfg.red;
   doc["green"]        = cfg.green;
@@ -782,6 +943,7 @@ void saveConfig() {
   doc["systemActive"] = cfg.systemActive;
   doc["modeOn"]       = cfg.modeOn;
   doc["pirDebounce"]  = cfg.pirDebounce;
+  doc["langFR"]       = cfg.langFR;
   serializeJson(doc, f);
   f.close();
 }
@@ -825,7 +987,7 @@ void saveWifi(const String &ssid, const String &pass) {
 //  JSON
 // ─────────────────────────────────────────────
 String buildStatusJson() {
-  StaticJsonDocument<256> doc;
+  StaticJsonDocument<300> doc;
   doc["systemActive"] = cfg.systemActive;
   doc["modeOn"]       = cfg.modeOn;
   doc["overrideOn"]   = overrideOn;
@@ -833,11 +995,12 @@ String buildStatusJson() {
   doc["pirState"]     = pirState;
   doc["inRange"]      = isInTimeRange();
   doc["time"]         = timeClient.getFormattedTime().substring(0, 5);
+  doc["langFR"]       = cfg.langFR;
   String out; serializeJson(doc, out); return out;
 }
 
 String buildConfigJson() {
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<600> doc;
   doc["numLeds"]     = cfg.numLeds;
   doc["red"]         = cfg.red;
   doc["green"]       = cfg.green;
@@ -851,6 +1014,7 @@ String buildConfigJson() {
   doc["endMin"]      = cfg.endMin;
   doc["tzOffset"]    = cfg.tzOffset;
   doc["pirDebounce"] = cfg.pirDebounce;
+  doc["langFR"]      = cfg.langFR;
   String out; serializeJson(doc, out); return out;
 }
 
@@ -892,6 +1056,13 @@ void setupPortalRoutes() {
     req->send(200, "text/plain", "OK");
     delay(1000);
     ESP.restart();
+  });
+
+  // Changement de langue depuis le portail
+  server.on("/toggle/lang", HTTP_POST, [](AsyncWebServerRequest* req) {
+    cfg.langFR = !cfg.langFR;
+    saveConfig();
+    req->send(200, "text/plain", "OK");
   });
 }
 
@@ -949,6 +1120,12 @@ void setupAppRoutes() {
     overrideOn = !overrideOn;
     applyLeds(overrideOn);
     if (!overrideOn) lightOffTime = 0;
+    req->send(200, "application/json", buildStatusJson());
+  });
+
+  server.on("/toggle/lang", HTTP_POST, [](AsyncWebServerRequest* req) {
+    cfg.langFR = !cfg.langFR;
+    saveConfig();
     req->send(200, "application/json", buildStatusJson());
   });
 
