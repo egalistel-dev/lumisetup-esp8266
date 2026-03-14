@@ -95,7 +95,7 @@ Install these from the Arduino Library Manager or GitHub:
 - Flash Size: **4MB (FS:2MB)**
 
 ### 2. Upload the sketch
-- Open `lampe_esp8266.ino` in Arduino IDE
+- Open `lumisetup.ino` in Arduino IDE
 - Upload to your NodeMCU
 
 ### 3. First boot — WiFi setup
@@ -149,7 +149,7 @@ To change your WiFi credentials:
 
 ```
 lumisetup-esp8266/
-└── lampe_esp8266.ino    ← Single file, all code + embedded HTML/CSS/JS
+└── lumisetup.ino    ← Single file, all code + embedded HTML/CSS/JS
 ```
 
 ---
