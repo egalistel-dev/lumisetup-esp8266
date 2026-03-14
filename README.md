@@ -24,6 +24,7 @@ Built by **Egalistel** — [egamaker.be](https://egamaker.be)
 - **mDNS** — Access the interface at `http://lumisetup.local` without knowing the IP address
 - **NTP time sync** — Accurate time from the internet, no RTC needed
 - **Persistent config** — All settings saved to flash (LittleFS), survive reboots
+- **Bilingual interface (FR/EN)** — Language selector in both the WiFi portal and main interface, choice saved and persisted across reboots. French is the default language
 - **Responsive web UI** — Works on mobile and desktop
 
 ---
@@ -101,7 +102,8 @@ Install these from the Arduino Library Manager or GitHub:
 - The ESP creates a WiFi access point: **`LumiSetup`** (password: `lumi1234`)
 - Connect to it from your phone or PC
 - The configuration page opens automatically (or go to `http://192.168.4.1`)
-- Enter your WiFi credentials and click **Se connecter**
+- Select your language (FR/EN) using the buttons at the top
+- Enter your WiFi credentials and connect
 - The ESP restarts and joins your network
 
 ### 4. Access the interface
@@ -119,6 +121,7 @@ Install these from the Arduino Library Manager or GitHub:
 | AUTO mode | PIR active within the time range |
 | ON mode | LEDs always on |
 | Override button | Force light on regardless of schedule |
+| FR / EN | Language selector — saved automatically |
 
 ### Configuration
 | Parameter | Description |
@@ -137,7 +140,7 @@ Install these from the Arduino Library Manager or GitHub:
 ## 🔄 Reset WiFi
 
 To change your WiFi credentials:
-- Open the web interface → scroll down → click **📶 Réinitialiser la connexion WiFi**
+- Open the web interface → scroll down → click **📶 Réinitialiser la connexion WiFi** (FR) or **📶 Reset WiFi connection** (EN)
 - Confirm → the ESP restarts and opens the `LumiSetup` access point again
 
 ---
