@@ -33,7 +33,8 @@ Built by **Egalistel** — [egamaker.be](https://egamaker.be)
 | Component | Details | Link |
 |-----------|---------|------|
 | ESP8266 NodeMCU | ESP-12E / ESP8266MOD | [AliExpress](https://s.click.aliexpress.com/e/_c3FoVFgx) |
-| PIR Sensor | SR505 or HC-SR501 (recommended) | [AliExpress](https://s.click.aliexpress.com/e/_c4lxAc4J) |
+| PIR Sensor | SR505 | [AliExpress](https://s.click.aliexpress.com/e/_c4BFKDQFJ) |
+| PIR Sensor | or HC-SR501 | [AliExpress](https://s.click.aliexpress.com/e/_c3IHPyYx) |
 | LEDs | WS2812B addressable strip | [AliExpress](https://s.click.aliexpress.com/e/_c4LMDEiT) |
 | Power supply | 5V external (min. 2A for 30 LEDs) | [AliExpress](https://s.click.aliexpress.com/e/_c3k73Qgn) |
 | DC Power connector | 5.5mm x 2.1mm female jack (for clean wiring) | [AliExpress](https://s.click.aliexpress.com/e/_c42pIl07) |
