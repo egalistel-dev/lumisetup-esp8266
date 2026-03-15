@@ -88,12 +88,17 @@ DNSServer      dnsServer;
 WiFiUDP        ntpUDP;
 NTPClient      timeClient(ntpUDP, "pool.ntp.org");
 
-bool          portalMode  = false;
-bool          ledsOn      = false;
-bool          overrideOn  = false;
-bool          pirState    = false;
+bool          portalMode   = false;
+bool          ledsOn       = false;
+bool          overrideOn   = false;
+bool          pirState     = false;
 unsigned long lightOffTime = 0;
 unsigned long lastPirTime  = 0;
+
+// Flag pour déclencher applyLeds() depuis le loop() et non depuis un callback async
+bool          pendingLeds     = false;
+bool          pendingLedsOn   = false;
+bool          pendingLedsSmooth = true;
 
 // ─────────────────────────────────────────────
 //  PAGE PORTAIL WIFI (HTML minimal bilingue)
@@ -111,61 +116,52 @@ body{background:#0f0f13;color:#e8e8f0;font-family:'Segoe UI',system-ui,sans-seri
 .card{background:#1a1a24;border:1px solid #2a2a3a;border-radius:16px;padding:32px;
       max-width:380px;width:100%;text-align:center;}
 h1{color:#f5a623;font-size:1.5rem;margin-bottom:6px;}
-p{color:#7a7a9a;font-size:.85rem;margin-bottom:28px;line-height:1.6;}
+p{color:#7a7a9a;font-size:.85rem;margin-bottom:24px;line-height:1.6;}
 label{display:block;text-align:left;font-size:.82rem;color:#7a7a9a;margin-bottom:4px;}
-input{width:100%;background:#0f0f13;border:1px solid #2a2a3a;border-radius:8px;
-      color:#e8e8f0;padding:12px;font-size:.95rem;margin-bottom:16px;outline:none;}
+input[type=text],input[type=password]{
+  width:100%;background:#0f0f13;border:1px solid #2a2a3a;border-radius:8px;
+  color:#e8e8f0;padding:12px;font-size:.95rem;margin-bottom:16px;outline:none;
+  -webkit-appearance:none;}
 input:focus{border-color:#f5a623;}
-button{width:100%;padding:14px;border-radius:10px;border:none;
-       background:#f5a623;color:#111;font-size:1rem;font-weight:700;cursor:pointer;transition:opacity .2s;}
-button:disabled{opacity:.5;cursor:not-allowed;}
-.msg{margin-top:16px;font-size:.85rem;color:#4caf7d;display:none;line-height:1.6;}
-.msg span{display:block;font-size:.78rem;color:#7a7a9a;margin-top:4px;}
-footer{margin-top:28px;font-size:.75rem;color:#4a4a6a;}
-footer a{color:#f5a623;text-decoration:none;}
+input[type=submit]{
+  width:100%;padding:14px;border-radius:10px;border:none;
+  background:#f5a623;color:#111;font-size:1rem;font-weight:700;
+  cursor:pointer;-webkit-appearance:none;}
 .lang-bar{display:flex;justify-content:flex-end;margin-bottom:16px;gap:6px;}
 .lang-btn{padding:4px 12px;border-radius:20px;border:1px solid #2a2a3a;
-          background:transparent;color:#7a7a9a;font-size:.8rem;cursor:pointer;transition:all .2s;}
+          background:transparent;color:#7a7a9a;font-size:.8rem;cursor:pointer;}
 .lang-btn.active{background:#f5a623;color:#111;border-color:#f5a623;font-weight:700;}
+footer{margin-top:28px;font-size:.75rem;color:#4a4a6a;}
+footer a{color:#f5a623;text-decoration:none;}
 </style>
 </head>
 <body>
 <div class="card">
   <div class="lang-bar">
-    <button class="lang-btn" id="btnFR" onclick="setLang(true)">FR</button>
-    <button class="lang-btn" id="btnEN" onclick="setLang(false)">EN</button>
+    <button class="lang-btn" id="btnFR" onclick="setLang(true);return false;">FR</button>
+    <button class="lang-btn" id="btnEN" onclick="setLang(false);return false;">EN</button>
   </div>
   <h1>💡 LumiSetup</h1>
-  <p id="pDesc"></p>
-  <label id="lblSsid"></label>
-  <input type="text" id="ssid" placeholder="">
-  <label id="lblPass"></label>
-  <input type="password" id="pass" placeholder="">
-  <button id="submitBtn" onclick="save()"></button>
-  <div class="msg" id="msg">
-    <span id="msgTitle"></span>
-    <span id="msgBody"></span>
-  </div>
+  <p id="pDesc">Configurez la connexion WiFi<br>pour votre lampe connectée.</p>
+  <form method="POST" action="/wifi/save">
+    <label id="lblSsid">Nom du réseau WiFi (SSID)</label>
+    <input type="text" name="ssid" id="ssid" placeholder="Mon réseau WiFi" required>
+    <label id="lblPass">Mot de passe</label>
+    <input type="password" name="pass" id="pass" placeholder="Mot de passe">
+    <input type="submit" id="submitBtn" value="Se connecter">
+  </form>
   <footer>Egalistel &nbsp;·&nbsp; <a href="https://egamaker.be" target="_blank">egamaker.be</a></footer>
 </div>
 <script>
 const T={
   fr:{desc:'Configurez la connexion WiFi<br>pour votre lampe connectée.',
       ssid:'Nom du réseau WiFi (SSID)',ssidPh:'Mon réseau WiFi',
-      pass:'Mot de passe',passPh:'Mot de passe',btn:'Se connecter',
-      saving:'Enregistrement...',noSsid:'Entrez un nom de réseau.',
-      msgTitle:'✓ Identifiants enregistrés !',
-      msgBody:"L'appareil redémarre et tente de rejoindre votre réseau.<br>Reconnectez-vous à votre WiFi habituel puis ouvrez<br><strong>http://lumisetup.local</strong>"},
+      pass:'Mot de passe',passPh:'Mot de passe',btn:'Se connecter'},
   en:{desc:'Configure the WiFi connection<br>for your smart lamp.',
       ssid:'WiFi Network Name (SSID)',ssidPh:'My WiFi Network',
-      pass:'Password',passPh:'Password',btn:'Connect',
-      saving:'Saving...',noSsid:'Please enter a network name.',
-      msgTitle:'✓ Credentials saved!',
-      msgBody:'The device is restarting and joining your network.<br>Reconnect to your home WiFi then open<br><strong>http://lumisetup.local</strong>'}
+      pass:'Password',passPh:'Password',btn:'Connect'}
 };
-
-let isFR = true;
-
+let isFR=true;
 function applyLang(){
   const l=isFR?T.fr:T.en;
   document.getElementById('pDesc').innerHTML=l.desc;
@@ -173,36 +169,15 @@ function applyLang(){
   document.getElementById('ssid').placeholder=l.ssidPh;
   document.getElementById('lblPass').textContent=l.pass;
   document.getElementById('pass').placeholder=l.passPh;
-  const btn=document.getElementById('submitBtn');
-  if(!btn.disabled) btn.textContent=l.btn;
+  document.getElementById('submitBtn').value=l.btn;
   document.getElementById('btnFR').classList.toggle('active',isFR);
   document.getElementById('btnEN').classList.toggle('active',!isFR);
 }
-
-async function setLang(fr){
+function setLang(fr){
   isFR=fr;
   applyLang();
-  try{ await fetch('/toggle/lang',{method:'POST'}); }catch(e){}
+  try{fetch('/toggle/lang',{method:'POST'});}catch(e){}
 }
-
-async function save(){
-  const ssid=document.getElementById('ssid').value.trim();
-  const pass=document.getElementById('pass').value;
-  const l=isFR?T.fr:T.en;
-  if(!ssid){alert(l.noSsid);return;}
-  const btn=document.getElementById('submitBtn');
-  btn.disabled=true;
-  btn.textContent=l.saving;
-  document.getElementById('msgTitle').textContent=l.msgTitle;
-  document.getElementById('msgBody').innerHTML=l.msgBody;
-  document.getElementById('msg').style.display='block';
-  try{
-    const b=new URLSearchParams({ssid,pass});
-    await fetch('/wifi/save',{method:'POST',body:b});
-  }catch(e){}
-}
-
-// Init
 applyLang();
 </script>
 </body></html>
@@ -763,6 +738,12 @@ void loop() {
     return;
   }
 
+  // Traitement du flag pendingLeds — déclenché par les callbacks async
+  if (pendingLeds) {
+    pendingLeds = false;
+    applyLeds(pendingLedsOn, pendingLedsSmooth);
+  }
+
   // NTP toutes les 60s
   static unsigned long lastNtp = 0;
   if (millis() - lastNtp > 60000) {
@@ -792,6 +773,13 @@ void loop() {
   }
 
   handlePir();
+
+  // DEBUG PIR — affiche l'état brut du GPIO toutes les 2 secondes
+  static unsigned long lastDebug = 0;
+  if (millis() - lastDebug > 2000) {
+    Serial.println("[DEBUG] GPIO14 = " + String(digitalRead(PIR_PIN)) + " | pirState = " + String(pirState));
+    lastDebug = millis();
+  }
 
   if (ledsOn && lightOffTime > 0 && millis() >= lightOffTime) {
     applyLeds(false);
@@ -848,7 +836,10 @@ void handlePir() {
       pirState    = true;
       lastPirTime = now;
       Serial.println("[PIR] Mouvement !");
+      Serial.println("[PIR] isInTimeRange = " + String(isInTimeRange()));
+      Serial.println("[PIR] heure = " + String(timeClient.getHours()) + ":" + String(timeClient.getMinutes()));
       if (isInTimeRange()) {
+        Serial.println("[LED] Allumage !");
         applyLeds(true);
         lightOffTime = millis() + (unsigned long)(cfg.duration * 1000UL);
       }
@@ -880,13 +871,23 @@ void applyLeds(bool on, bool smooth) {
     for (int i = 0; i < cfg.numLeds && i < MAX_LEDS; i++)
       leds[i] = CRGB(cfg.red, cfg.green, cfg.blue);
     if (smooth && cfg.fadeEffect) {
-      for (int b = 0; b <= target; b += 4) { FastLED.setBrightness(b); FastLED.show(); delay(12); }
+      for (int b = 0; b <= target; b += 4) {
+        FastLED.setBrightness(b);
+        FastLED.show();
+        delay(12);
+        yield();  // nourrit le watchdog ESP8266
+      }
     }
     FastLED.setBrightness(target);
     FastLED.show();
   } else {
     if (smooth && cfg.fadeEffect) {
-      for (int b = target; b >= 0; b -= 4) { FastLED.setBrightness(b); FastLED.show(); delay(12); }
+      for (int b = target; b >= 0; b -= 4) {
+        FastLED.setBrightness(b);
+        FastLED.show();
+        delay(12);
+        yield();  // nourrit le watchdog ESP8266
+      }
     }
     FastLED.clear();
     FastLED.setBrightness(0);
@@ -1103,7 +1104,10 @@ void setupAppRoutes() {
 
   server.on("/toggle/system", HTTP_POST, [](AsyncWebServerRequest* req) {
     cfg.systemActive = !cfg.systemActive;
-    if (!cfg.systemActive) { overrideOn = false; applyLeds(false, false); }
+    if (!cfg.systemActive) {
+      overrideOn = false;
+      pendingLeds = true; pendingLedsOn = false; pendingLedsSmooth = false;
+    }
     saveConfig();
     req->send(200, "application/json", buildStatusJson());
   });
@@ -1111,14 +1115,14 @@ void setupAppRoutes() {
   server.on("/toggle/mode", HTTP_POST, [](AsyncWebServerRequest* req) {
     cfg.modeOn = !cfg.modeOn;
     overrideOn = false;
-    applyLeds(cfg.modeOn);
+    pendingLeds = true; pendingLedsOn = cfg.modeOn; pendingLedsSmooth = true;
     saveConfig();
     req->send(200, "application/json", buildStatusJson());
   });
 
   server.on("/toggle/override", HTTP_POST, [](AsyncWebServerRequest* req) {
     overrideOn = !overrideOn;
-    applyLeds(overrideOn);
+    pendingLeds = true; pendingLedsOn = overrideOn; pendingLedsSmooth = true;
     if (!overrideOn) lightOffTime = 0;
     req->send(200, "application/json", buildStatusJson());
   });
