@@ -34,19 +34,19 @@ Built by **Egalistel** — [egamaker.be](https://egamaker.be)
 | Component | Details | Link |
 |-----------|---------|------|
 | ESP8266 NodeMCU | ESP-12E / ESP8266MOD | [AliExpress](https://s.click.aliexpress.com/e/_c3FoVFgx) |
-| PIR Sensor | SR505 | [AliExpress](https://s.click.aliexpress.com/e/_c4BFKDQFJ) |
-| PIR Sensor | or HC-SR501 | [AliExpress](https://s.click.aliexpress.com/e/_c3IHPyYx) |
+| PIR Sensor | HC-SR501 (recommended) | [AliExpress](https://s.click.aliexpress.com/e/_c3IHPyYx) |
+| PIR Sensor | or SR505 | [AliExpress](https://s.click.aliexpress.com/e/_c4BFKDQFJ) |
 | LEDs | WS2812B addressable strip | [AliExpress](https://s.click.aliexpress.com/e/_c4LMDEiT) |
 | Power supply | 5V external (min. 2A for 30 LEDs) | [AliExpress](https://s.click.aliexpress.com/e/_c3k73Qgn) |
 | DC Power connector | 5.5mm x 2.1mm female jack (for clean wiring) | [AliExpress](https://s.click.aliexpress.com/e/_c42pIl07) |
 
-> ⚠️ The HC-SR501 is recommended over the SR505 — it has adjustable sensitivity and a much shorter retriggering time.
+> ⚠️ The HC-SR501 is recommended over the SR505 — it has adjustable sensitivity, a shorter retriggering time, and is much more reliable.
 
 ---
 
 ## 🔌 Wiring
 
-![Wiring Diagram](wiring.svg)
+![Wiring Diagram](images/wiring.svg)
 
 ```
 PIR Sensor       NodeMCU
@@ -66,6 +66,8 @@ Power supply
 
 > ⚠️ The GND must be common between the external power supply and the NodeMCU. Without this, the LEDs will not work correctly.
 
+> ⚠️ WS2812B strips have a **data direction** — make sure to connect the **DIN** end (indicated by an arrow on the strip pointing away from the connector). Connecting from the wrong end will result in no output.
+
 ---
 
 ## 📦 Required Libraries
@@ -82,6 +84,8 @@ Install these from the Arduino Library Manager or GitHub:
 
 > ⚠️ Do NOT install WiFiManager — it conflicts with ESPAsyncWebServer. The captive portal is handled directly in the code.
 
+> ℹ️ `ESP8266WiFi`, `ESP8266mDNS`, `DNSServer`, `LittleFS` and `WiFiUdp` are included automatically with the ESP8266 board package — nothing extra to install.
+
 ---
 
 ## 🚀 Installation
@@ -91,6 +95,7 @@ Install these from the Arduino Library Manager or GitHub:
   ```
   https://arduino.esp8266.com/stable/package_esp8266com_index.json
   ```
+- Go to **Tools → Board → Boards Manager**, search for `esp8266` and install **esp8266 by ESP8266 Community**
 - Select **NodeMCU 1.0 (ESP-12E Module)**
 - Flash Size: **4MB (FS:2MB)**
 
@@ -149,7 +154,12 @@ To change your WiFi credentials:
 
 ```
 lumisetup-esp8266/
-└── lumisetup.ino    ← Single file, all code + embedded HTML/CSS/JS
+├── lumisetup.ino        ← Single file, all code + embedded HTML/CSS/JS
+├── LICENSE
+└── images/
+    ├── wiring.svg
+    ├── screenshot-portal.svg
+    └── screenshot-main.svg
 ```
 
 ---
